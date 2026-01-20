@@ -6,8 +6,6 @@ Welcome to **Forest Adventure**, an immersive, text-based interactive fiction ga
 
 This project represents a fusion of classic text adventure nostalgia and modern artificial intelligence. By leveraging the power of Large Language Models (LLMs) via the **Groq API**, Forest Adventure moves beyond static decision trees. Instead, it generates unique descriptions, dynamic scenarios, and unpredictable outcomes every time you play. The player finds themselves trapped in a mysterious, shifting forest, tasked with the ultimate goal of locating a legendary lost treasure while managing their physical health and navigating a world teeming with potential hazards.
 
-
-
 ## Project Description and Motivation
 
 The core motivation behind Forest Adventure was to explore how Python can interact with external APIs to create non-deterministic gameplay loops. In traditional text adventures, if a player chooses to "Go North," the result is hard-coded. In Forest Adventure, the result is "hallucinated" vividly by an AI based on the current context of the game.
@@ -17,8 +15,6 @@ This project utilizes Python for the game engine—handling the logic of probabi
 ## Technical Architecture & Code Explanation
 
 The game is built as a single-script Python application (`adventure.py`) that acts as a bridge between the user and the LLM. Below is a detailed breakdown of how the code functions.
-
-
 
 ### 1. Libraries and Setup
 The project relies on a minimal set of robust libraries:
@@ -34,8 +30,6 @@ The core logic resides in an infinite `while` loop that only breaks upon a Win, 
     * *Win Chance*: `30 - 2 * turn_count` (The denominator decreases, making a win *more* likely as you survive longer).
     * *Loss Chance*: `25 - 2 * turn_count` (The risk of death also increases as the game progresses).
     * *Sudden Death*: If the player reaches **Turn 10**, the game forces a 50/50 coin flip for immediate victory or defeat.
-
-
 
 ### 3. Prompt Engineering (`build_prompt` function)
 The most complex part of the code is the dynamic string construction for the LLM. The `build_prompt` function assembles a specific instructions set based on the game state:
