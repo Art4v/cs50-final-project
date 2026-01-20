@@ -36,6 +36,13 @@ Welcome to **Forest Adventure**, a text-based AI-powered adventure game where th
    python adventure.py
    ```
 
+## Video Demo
+
+You can find the video demo at:
+
+https://www.youtube.com/watch?v=iFQdkbykKVw
+
+
 ## GitHub Repository
 
 You can find the project source code and updates at: 
@@ -43,7 +50,7 @@ You can find the project source code and updates at:
 https://github.com/Art4v/cs50-final-project
 
 
-## AI Assistance
+## AI Usage
 
 This project uses AI to generate dynamic text-based game scenes and summaries. Specifically:
 
