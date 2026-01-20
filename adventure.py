@@ -47,8 +47,9 @@ def load():
             print(".", end="")
             sleep(speed / 5)
             print(".")
+            sleep(speed / 5)
     sleep(speed)
-    print("\n!!!\n")
+    print("!!!\n")
     sleep(speed / 2)
 
 # typing animations
@@ -83,55 +84,70 @@ def typed_input(text):
 # ------------------
 
 # build prompt function
-def build_prompt(current_scene, inventory, hazards, win, lose, option):
+def build_prompt(current_scene, inventory, hazards, win, lose, option, history, turn_count):
     # get current scene summary (compressed memory)
-    summary = summarise_scene(current_scene, option)
+    history.append(summarise_scene(current_scene, option, turn_count))
 
     # win condition prompt
     if win:
         return f"""
-    You are a text-based adventure game narrator.
+        You are a text-based adventure game narrator.
 
-    The player has reached a winning condition.
+        GAME STATE:
+        - The player has achieved a WIN condition.
 
-    PAST EVENTS (SUMMARY):
-    {summary}
+        STORY MEMORY (CHRONOLOGICAL):
+        {history}
 
-    INVENTORY:
-    {', '.join(inventory) if inventory else 'empty'}
+        PLAYER INVENTORY:
+        {', '.join(inventory) if inventory else 'empty'}
 
-    CURRENT HAZARDS:
-    {', '.join(hazards) if hazards else 'empty'}
+        ACTIVE HAZARDS:
+        {', '.join(hazards) if hazards else 'empty'}
 
-    TASK:
-    Describe the final victory scene in 2–3 sentences.
-    Make it clear the player has found the lost treasure and escaped the forest.
-    Ensure that scene is cohesive with the past events summary. 
-    Do NOT present any further options.
-    """
+        TASK:
+        - Write the FINAL victory scene in 2–3 sentences using a second person narration style.
+        - The player must successfully find the lost treasure AND escape the forest.
+        - The scene must logically follow the MOST RECENT player choice.
+        - Maintain continuity with the story memory above.
+        - Be conclusive and final.
+
+        RULES:
+        - Do NOT present options.
+        - Do NOT introduce new items or hazards.
+        - Do NOT contradict past events.
+        """
+
 
     # loss condition prompt
     elif lose:
         return f"""
-    You are a text-based adventure game narrator.
+        You are a text-based adventure game narrator.
 
-    The player has reached a losing condition.
+        GAME STATE:
+        - The player has reached a LOSS condition.
 
-    PAST EVENTS (SUMMARY):
-    {summary}
+        STORY MEMORY (CHRONOLOGICAL):
+        {history}
 
-    INVENTORY:
-    {', '.join(inventory) if inventory else 'empty'}
+        PLAYER INVENTORY:
+        {', '.join(inventory) if inventory else 'empty'}
 
-    CURRENT HAZARDS:
-    {', '.join(hazards) if hazards else 'empty'}
+        ACTIVE HAZARDS:
+        {', '.join(hazards) if hazards else 'empty'}
 
-    TASK:
-    Describe the player's death or failure in 2–3 sentences.
-    Make it final and conclusive.
-    Ensure that scene is cohesive with the past events summary. 
-    Do NOT present any further options.
-    """
+        TASK:
+        - Write the FINAL failure or death scene in 2–3 sentences using a second person narration style.
+        - The outcome must be permanent and conclusive.
+        - The scene must logically follow the MOST RECENT player choice.
+        - Maintain continuity with the story memory above.
+
+        RULES:
+        - Do NOT present options.
+        - Do NOT introduce new items or hazards.
+        - Do NOT contradict past events.
+        """
+
 
     # normal game continuation prompt
     else:
@@ -153,42 +169,44 @@ def build_prompt(current_scene, inventory, hazards, win, lose, option):
             hazards.append(gained_hazard)
         
         return f"""
+        You are a text-based adventure game engine.
 
-     
-    You are a text-based adventure game engine.
+        STORY MEMORY (CHRONOLOGICAL):
+        {history}
 
-    PAST EVENTS (SUMMARY):
-    {summary}
+        PLAYER INVENTORY:
+        {', '.join(inventory) if inventory else 'empty'}
 
-    INVENTORY:
-    {', '.join(inventory) if inventory else 'empty'}
+        ACTIVE HAZARDS:
+        {', '.join(hazards) if hazards else 'empty'}
 
-    CURRENT HAZARDS:
-    {', '.join(hazards) if hazards else 'empty'}
+        TASK:
+        - Continue the story in 2–4 sentences using a second person narration style.
+        - The scene MUST be a direct consequence of the player’s MOST RECENT choice.
+        - Maintain a tense, mysterious forest atmosphere.
+        {f"- Introduce the newly discovered item: {gained_item}." if gained_item else ""}
+        {f"- Introduce the newly encountered hazard: {gained_hazard}." if gained_hazard else ""}
 
-    NEW EVENT:
-    Continue the story in 2–4 sentences.
-    Naturally incorporate the environment and tension of the forest.
-    {f"The player finds a {gained_item}. Ensure this item discovery is properly implemented into the story." if gained_item else ""}. 
-    {f"The player finds a {gained_hazard}. Ensure this hazard discovery is properly implemented into the story. " if gained_hazard else ""}. 
+        RULES:
+        - Present EXACTLY four numbered options (1–4).
+        - ONLY ONE option may be dangerous.
+        - At least ONE option must meaningfully reference the player’s inventory (if not empty).
+        - Do NOT contradict previous events.
+        - Do NOT mention the word “summary”.
 
+        FORMAT (STRICT — FOLLOW EXACTLY):
 
-    INSTRUCTIONS:
-    - Present exactly four numbered options (1–4).
-    - Only ONE option may be dangerous.
-    - Do NOT contradict past events.
-    - Do NOT mention the word "summary".
+        <consequence of the player's most recent choice>
 
-    FORMAT EXACTLY LIKE THIS:
+        <scene description>
 
-    <scene description>
+        Options:
+        1. ...
+        2. ...
+        3. ...
+        4. ...
+        """
 
-    Options:
-    1. ...
-    2. ...
-    3. ...
-    4. ...
-    """
 
 # get next scene function
 def get_next_scene(prompt):
@@ -203,27 +221,32 @@ def get_next_scene(prompt):
     return response.choices[0].message.content
 
 # summarise current scene function
-def summarise_scene(scene, option):
+def summarise_scene(scene, option, turn_count):
     # scaffold prompt
     prompt = f"""
-    You are summarising a turn in a text-based adventure game.
+    You are compressing memory for a text-based adventure game.
 
     TASK:
-    - Summarise the scene in 1–2 sentences.
-    - Include ONLY what happened and the player's chosen action.
-    - Ignore all other options that were not chosen.
-    - Do NOT invent new events.
-    - Keep it concise and factual.
+    - Summarise ONE turn in 1–2 sentences.
+    - Include ONLY events that occurred and the player’s chosen action.
+    - Ignore all unchosen options.
+    - Do NOT invent or infer new information.
+    - Be factual and concise.
+
+    TURN NUMBER:
+    {turn_count}
 
     INPUT SCENE:
     {scene}
 
-    PLAYER CHOICE:
-    The player chose option {option}.
+    PLAYER ACTION:
+    Option {option}
 
-    OUTPUT FORMAT:
-    <summary of what happened and the chosen action>
-    """ 
+    OUTPUT FORMAT (STRICT):
+
+    Turn {turn_count}: <brief factual summary>
+    """
+
 
     # request prompt for api
     response = client.chat.completions.create(
@@ -244,7 +267,7 @@ def summarise_scene(scene, option):
 # greeting function
 def start():
     type("*** WELCOME TO YOUR FOREST ADVENTURE ***")
-    type("This is a text-based AI-powered adventure game where your mission is to find the lost treasure of the forest. Select options by inputting the digits 1, 2, 3, or 4 when prompted. To exit at any time, type 'exit'")
+    type("This is an AI-powered text-adventure game where your mission is to find the lost treasure of the forest. Select options by inputting the digits 1, 2, 3, or 4 when prompted. To exit at any time, type 'exit'")
     while True:
         # get user input
         start = typed_input("Would you like to begin your journey? (y/n) ")
@@ -254,7 +277,7 @@ def start():
             type("Loading Journey...")
             load()
             type("Good luck!")
-            print("\n***\n")
+            print("\n***")
             sleep(speed)
             break
         elif start.lower() in ["n", "exit"]:
@@ -268,12 +291,13 @@ def start():
 # game start function
 def game():
 
-    # initialise turn count, win and loss trackers,, and inventory
+    # initialise turn count, win and loss trackers, inventory, and history
     turn_count = 1
     win = False
     lose = False
     inventory = []
     hazards = []
+    history = []
 
     # initial scene
     scene = (
@@ -288,14 +312,19 @@ def game():
 
     # game loop
     while True:
+        # print(f"\nWin:{win}, Lose: {lose}\n")        
         # type out scenario
         print()
         type(scene)
         if win == True:
+            print()
             print("CONGRATULATIONS ON FINDING THE LOST TREASURE AND ESCAPING THE FOREST!")
+            print()
             break
         if lose == True:
+            print()
             print("GAME OVER!")
+            print()
             break
 
 
@@ -310,22 +339,21 @@ def game():
         # actions based on choice
         if choice in {"1", "2", "3", "4"}:
             # update global variables
-            turn_count += 1
-            chance_win = max(2, 15 - turn_count)
-            chance_lose = max(2, 10 - turn_count)
+            chance_win = 30 - 2 * turn_count
+            chance_lose = 25 - 2 * turn_count
 
             # win probability (increasing with turn_count)
-            if randint(1, chance_win) == 1:
+            if randint(1, chance_win) == 1 and turn_count != 1:
                 win = True
                 lose = False
 
             # loss probability (increasing with turn_count)
-            if randint(1, chance_lose) == 1:
+            if randint(1, chance_lose) == 1  and turn_count != 1:
                 lose = True
                 win = False
 
             # if at turn 10, neither win or loss:
-            if turn_count == 5:
+            if turn_count == 10:
                 if randint(0, 1) == 1:
                     win = True
                     lose = False
@@ -335,9 +363,12 @@ def game():
                     lose = True
                 
             # build prompt
-            prompt = build_prompt(scene, inventory, hazards, win, lose, choice)
+            prompt = build_prompt(scene, inventory, hazards, win, lose, choice, history, turn_count)
             scene = get_next_scene(prompt)
 
+            # change turn 
+            turn_count += 1
+        
         if choice == "exit":
             sleep(speed)
             print()
