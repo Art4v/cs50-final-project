@@ -1,21 +1,31 @@
-# libraries
+# ------------
+#  libraries
+# ------------
 from groq import Groq
 from random import randint, choice
 from sys import stdout
 from time import sleep
 
-# global variable for speed
-speed = 0.5
+# ------------
+# global variables
+# ------------
 
-# store api key
+# speed
+speed = 1
+
+# api key
 client = Groq(api_key="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")
 
 # list of potential items
 ITEMS = ["lantern", "old map", "rusty key", "silver dagger", "magic potion", "gold coin"]
 HAZARDS = ["poisonous fog", "hidden snare", "falling branch", "wild animal", "quicksand", "spike trap"]
 
+# -----------
+# animations
+# -----------
+
 # loading animation
-def load(n):
+def load():
     for _ in range(randint(3, 8)):
             sleep(speed / 5)
             print(".", end="")
@@ -45,96 +55,126 @@ def type(text):
     print()
     sleep(speed)
 
-def typed_input(prompt):
+def typed_input(text):
     delay = (speed/100)
     
-    for char in prompt:
+    for char in text:
         stdout.write(char)
         stdout.flush()
         sleep(delay)
     return input()
 
-# check death function
-def is_player_dead(state):
-    return state["health"] <= 0
-
-# get player state
-def parse_state_update(text, state):
-    health_change = 0
-    item = None
-    win = False
-
-    for line in text.splitlines():
-        if line.startswith("health_change:"):
-            health_change = int(line.split(":")[1].strip())
-        elif line.startswith("item_gained:"):
-            item = line.split(":")[1].strip()
-        elif line.startswith("win:"):
-            win = line.split(":")[1].strip().lower() == "yes"
-
-    state["health"] += health_change
-
-    if item and item.lower() != "none":
-        state["inventory"].append(item)
-
-    state["win"] = win
-    return state
+# ------------------
+# LLM functionality
+# ------------------
 
 # build prompt function
-def build_prompt(player_choice, state, turn_count, win_turn, death_turn):
-    # decide random item and hazard for this turn
-    item_this_turn = choice(ITEMS)
-    hazard_this_turn = choice(HAZARDS)
+def build_prompt(current_scene, inventory, hazards, win, lose, option):
+    # get current scene summary (compressed memory)
+    summary = summarise_scene(current_scene, option)
 
-    # win/death flags
-    win_flag = "none"
-    death_flag = "none"
+    # win condition prompt
+    if win:
+        return f"""
+    You are a text-based adventure game narrator.
 
-    if turn_count == win_turn:
-        win_flag = "true"
-    if turn_count == death_turn:
-        death_flag = "true"
+    The player has reached a winning condition.
 
-    return f"""
-You are a text-based adventure game engine.
+    PAST EVENTS (SUMMARY):
+    {summary}
 
-SETTING:
-The player is trapped in a mysterious forest searching for a lost treasure.
-The forest contains random items and hazards: {item_this_turn} and {hazard_this_turn} may appear in this turn.
+    INVENTORY:
+    {', '.join(inventory) if inventory else 'empty'}
 
-PLAYER STATE:
-- Health: {state['health']}
-- Inventory: {', '.join(state['inventory']) if state['inventory'] else 'empty'}
+    CURRENT HAZARDS:
+    {', '.join(hazards) if hazards else 'empty'}
 
-PLAYER CHOICE:
-The player chose option: {player_choice}
+    TASK:
+    Describe the final victory scene in 2–3 sentences.
+    Make it clear the player has found the lost treasure and escaped the forest.
+    Ensure that scene is cohesive with the past events summary. 
+    Do NOT present any further options.
+    """
 
-INSTRUCTIONS:
-1. Describe what happens next in 2–4 sentences.
-2. Present exactly four numbered options (1–4).
-3. Include a STATE UPDATE section.
-4. Health changes must be between -50 and +20 normally.
-5. Only add ONE item at most; if using the item_this_turn, it may appear in inventory.
-6. The player may die if health reaches 0.
-7. If win_flag is true, one option must lead to a win (win: yes).
-8. If death_flag is true, one option must lead to immediate death (health_change <= -200).
-9. Incorporate the random hazard {hazard_this_turn} and/or item {item_this_turn} into the scene naturally.
+    # loss condition prompt
+    elif lose:
+        return f"""
+    You are a text-based adventure game narrator.
 
-FORMAT EXACTLY LIKE THIS:
+    The player has reached a losing condition.
 
-<scene description>
+    PAST EVENTS (SUMMARY):
+    {summary}
 
-STATE UPDATE:
-health_change: <integer>
-item_gained: <item name or none>
-win: <yes or no>
+    INVENTORY:
+    {', '.join(inventory) if inventory else 'empty'}
 
-Options:
-1. ...
-2. ...
-3. ...
-4. ...
-"""
+    CURRENT HAZARDS:
+    {', '.join(hazards) if hazards else 'empty'}
+
+    TASK:
+    Describe the player's death or failure in 2–3 sentences.
+    Make it final and conclusive.
+    Ensure that scene is cohesive with the past events summary. 
+    Do NOT present any further options.
+    """
+
+    # normal game continuation prompt
+    else:
+        # 1/4 chance of receiving an item
+        available_items = [item for item in ITEMS if item not in inventory]
+        gained_item = None
+
+        if available_items and randint(1, 4) == 1:
+            gained_item = choice(available_items)
+            inventory.append(gained_item)
+        else:
+            gained_item = None
+        # 1/4 chance of encountering a hazard:   
+        available_hazard = [hazard for hazard in HAZARDS if hazard is not hazards]
+        gained_hazard = None
+
+        if available_hazard and randint(1, 4) == 1:
+            gained_hazard = choice(available_hazard)
+            hazards.append(gained_hazard)
+        
+        return f"""
+
+     
+    You are a text-based adventure game engine.
+
+    PAST EVENTS (SUMMARY):
+    {summary}
+
+    INVENTORY:
+    {', '.join(inventory) if inventory else 'empty'}
+
+    CURRENT HAZARDS:
+    {', '.join(hazards) if hazards else 'empty'}
+
+    NEW EVENT:
+    Continue the story in 2–4 sentences.
+    Naturally incorporate the environment and tension of the forest.
+    {f"The player finds a {gained_item}. Ensure this item discovery is properly implemented into the story." if gained_item else ""}. 
+    {f"The player finds a {gained_hazard}. Ensure this hazard discovery is properly implemented into the story. " if gained_hazard else ""}. 
+
+
+    INSTRUCTIONS:
+    - Present exactly four numbered options (1–4).
+    - Only ONE option may be dangerous.
+    - Do NOT contradict past events.
+    - Do NOT mention the word "summary".
+
+    FORMAT EXACTLY LIKE THIS:
+
+    <scene description>
+
+    Options:
+    1. ...
+    2. ...
+    3. ...
+    4. ...
+    """
 
 # get next scene function
 def get_next_scene(prompt):
@@ -148,6 +188,45 @@ def get_next_scene(prompt):
     )
     return response.choices[0].message.content
 
+# summarise current scene function
+def summarise_scene(scene, option):
+    # scaffold prompt
+    prompt = f"""
+    You are summarising a turn in a text-based adventure game.
+
+    TASK:
+    - Summarise the scene in 1–2 sentences.
+    - Include ONLY what happened and the player's chosen action.
+    - Ignore all other options that were not chosen.
+    - Do NOT invent new events.
+    - Keep it concise and factual.
+
+    INPUT SCENE:
+    {scene}
+
+    PLAYER CHOICE:
+    The player chose option {option}.
+
+    OUTPUT FORMAT:
+    <summary of what happened and the chosen action>
+    """ 
+
+    # request prompt for api
+    response = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {"role": "system", "content": "You summarise game events for memory compression."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.3     
+    )
+
+    return response.choices[0].message.content.strip()
+
+# ---------------
+# main functions
+# ---------------
+
 # greeting function
 def start():
     type("*** WELCOME TO YOUR FOREST ADVENTURE ***")
@@ -159,7 +238,7 @@ def start():
         if start.lower() == "y":
             sleep(speed)
             type("Loading Journey...")
-            load(3)
+            load()
             type("Good luck!")
             print("\n***\n")
             sleep(speed)
@@ -170,73 +249,88 @@ def start():
             exit()
         
     game()
-    return      
+    return    
 
 # game start function
 def game():
-    # define state variables
-    state = {
-        "health": 100,
-        "inventory": [],
-        "win": False
-    }
 
-    # decide random turns for win and death
-    win_turn = randint(2, 5)      # win must occur in 2–5 moves
-    death_turn = randint(1, 5)    # death must occur in 1–5 moves
-    turn_count = 0
+    # initialise turn count, win and loss trackers,, and inventory
+    turn_count = 1
+    win = False
+    lose = False
+    inventory = []
+    hazards = []
 
     # initial scene
     scene = (
         "You wake beneath towering, ancient trees. A cold mist clings to the forest floor.\n"
-        "Somewhere in this forest lies a lost treasure—and possibly your escape.\n\n"
+        "Somewhere in this forest lies a lost treasure — and possibly your escape.\n\n"
         "Options:\n"
         "1. Follow the sound of running water\n"
         "2. Approach the stone archway\n"
-        "3. Pick up the rusted lantern and walk the narrow path\n"
+        "3. Walk the narrow path\n"
         "4. Call out for help"
     )
 
     # game loop
     while True:
-        turn_count += 1
-        
         # type out scenario
         print()
         type(scene)
+        if win == True:
+            print("CONGRATULATIONS ON FINDING THE LOST TREASURE AND ESCAPING THE FOREST!")
+            break
+        if lose == True:
+            print("GAME OVER!")
+            break
 
-        # show HUD
-        type(f"\n[Turn {turn_count} | Health: {state['health']} | Inventory: {state['inventory']}]\n")
+
+        # show inventory
+        print(f"Inventory: {inventory}")
 
         # get choice
-        choice = typed_input("\n\nChoose an option (1–4): ")
+        choice = ""
+        while choice not in {"1", "2", "3", "4", "exit"}:
+            choice = typed_input("\n\nChoose an option (1–4), or type 'exit': ")
 
-        if choice not in {"1", "2", "3", "4", "exit"}:
-            print("\nInvalid choice. Try again.")
-            continue
+        # actions based on choice
+        if choice in {"1", "2", "3", "4"}:
+            # update global variables
+            turn_count += 1
+            chance_win = max(2, 15 - turn_count)
+            chance_lose = max(2, 10 - turn_count)
+
+            # win probability (increasing with turn_count)
+            if randint(1, chance_win) == 1:
+                win = True
+                lose = False
+
+            # loss probability (increasing with turn_count)
+            if randint(1, chance_lose) == 1:
+                lose = True
+                win = False
+
+            # if at turn 10, neither win or loss:
+            if turn_count == 5:
+                if randint(0, 1) == 1:
+                    win = True
+                    lose = False
+                else:
+                    # lose
+                    win = False
+                    lose = True
+                
+            # build prompt
+            prompt = build_prompt(scene, inventory, hazards, win, lose, choice)
+            scene = get_next_scene(prompt)
 
         if choice == "exit":
             sleep(speed)
             type("Come Back Soon!")
             exit()
 
-        # build prompt with turn info
-        prompt = build_prompt(choice, state, turn_count, win_turn, death_turn)
-        scene = get_next_scene(prompt)
-
-        # apply state changes and check for win
-        state = parse_state_update(scene, state)
-
-        if state.get("win", False):
-            type("\nA brilliant light shines from the trees...")
-            type("Congratulations! You have found the lost treasure and won the game!")
-            break
-
-        # check death
-        if is_player_dead(state):
-            type("\nYour vision fades as the forest grows silent...")
-            type("You have died.")
-            break
-
+# --------------
 # call function
+# --------------
+
 start()
