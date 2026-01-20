@@ -1,20 +1,34 @@
-# ------------
-#  libraries
-# ------------
+# ----------
+# libraries
+# ----------
+
 from groq import Groq
+from os import getenv
 from random import randint, choice
-from sys import stdout
+from sys import stdout, exit
 from time import sleep
 
-# ------------
+# --------------
+# api key setup
+# --------------
+
+api_key = getenv("GROQ_API_KEY")
+if not api_key:
+    print("Error: GROQ_API_KEY not set.")
+    print("Please provide your Groq API key, or set as an environment variable.")
+    if input("Would you like to provide your Groq API Key? (y/n) ").lower() == "y":
+        api_key = input("Enter your Groq API key: ").strip()
+    else:
+        exit(1)
+
+client = Groq(api_key=api_key)
+
+# -----------------
 # global variables
-# ------------
+# -----------------
 
-# speed
+# delay
 speed = 1
-
-# api key
-client = Groq(api_key="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")
 
 # list of potential items
 ITEMS = ["lantern", "old map", "rusty key", "silver dagger", "magic potion", "gold coin"]
@@ -326,11 +340,13 @@ def game():
 
         if choice == "exit":
             sleep(speed)
+            print()
             type("Come Back Soon!")
+            print()
             exit()
 
-# --------------
-# call function
-# --------------
+# -----------------------------
+# call functions to start game
+# -----------------------------
 
 start()
