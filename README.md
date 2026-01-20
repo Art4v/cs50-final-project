@@ -40,9 +40,19 @@ Welcome to **Forest Adventure**, a text-based AI-powered adventure game where th
 
 You can find the project source code and updates at: 
 
-[Your GitHub Repository Link Here](https://github.com/yourusername/your-repo)
+https://github.com/Art4v/cs50-final-project
+
+
+## AI Assistance
+
+This project uses AI to generate dynamic text-based game scenes and summaries. Specifically:
+
+Groq LLM API (llama-3.1-8b-instant) was used to generate story events, summarize past scenes, and manage game state updates.
+
+AI was only used for scene creation and summarization, while all game logic, input handling, and state tracking were implemented manually in Python.
+
+This acknowledges AI assistance while clarifying what was manually implemented, which aligns with CS50’s policies on transparency.
 
 ---
 
 Enjoy your adventure in the mysterious forest!
-
